@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ASCII Face Effect - Cyberpunk Matrix</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.7.0/p5.min.js"></script>
+    <script src="https://unpkg.com/ml5@latest/dist/ml5.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background-color: #000;
+            font-family: 'Courier New', monospace;
+        }
+
+        canvas {
+            display: block;
+            margin: 0 auto;
+        }
+
+        #loading {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #ff6600;
+            font-size: 24px;
+            text-align: center;
+            z-index: 1000;
+            text-shadow: 0 0 10px #ff6600;
+        }
+
+        #info {
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            color: #ff8800;
+            font-size: 12px;
+            text-shadow: 0 0 5px #ff6600;
+            z-index: 100;
+        }
+    </style>
+</head>
+<body>
+    <div id="loading">INITIALIZING FACE DETECTION...<br>LOADING NEURAL NETWORK...</div>
+    <div id="info">CYBERPUNK ASCII FACE TRACKER v2.0</div>
+    <script src="sketch.js"></script>
+</body>
+</html>

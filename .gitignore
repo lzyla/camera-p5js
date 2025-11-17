@@ -1,0 +1,32 @@
+# OS Files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Node modules (if using npm in future)
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# Temporary files
+*.tmp
+*.log
+
+# Build files
+dist/
+build/
+
+# Screenshots and captures
+*.png
+*.jpg
+*.jpeg
+*.gif
+!preview.png
+!demo.png
