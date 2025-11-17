@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ASCII Art Effect Demo (No Camera)</title>
+    <script src="node_modules/p5/lib/p5.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background-color: #000000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            flex-direction: column;
+        }
+        canvas {
+            display: block;
+        }
+        .info {
+            color: #ff9900;
+            font-family: 'Courier New', monospace;
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            font-size: 14px;
+            text-shadow: 0 0 10px #ff9900;
+        }
+    </style>
+</head>
+<body>
+    <div class="info">DEMO MODE - Simulated Video Feed</div>
+    <script src="demo.js"></script>
+</body>
+</html>
