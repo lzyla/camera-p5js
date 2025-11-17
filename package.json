@@ -13,7 +13,6 @@
     "patch-package": "^8.0.1"
   },
   "dependencies": {
-    "ml5": "^1.0.1",
     "p5": "^2.1.1"
   }
 }
