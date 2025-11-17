@@ -1,11 +1,45 @@
 "use strict";
 let capture;
+let particles = [];
+let bgShapes = [];
+let glitchOffset = 0;
+let glitchActive = false;
+let centerOfMassX = 0;
+let centerOfMassY = 0;
+let prevCenterX = 0;
+let prevCenterY = 0;
+let movementIntensity = 0;
 
 function setup() {
 	createCanvas(1200, 800);
 	capture = createCapture(VIDEO);
 	capture.hide();
 	capture.size(1200, 800);
+
+	// Initialize background particles
+	for (let i = 0; i < 100; i++) {
+		particles.push({
+			x: random(width),
+			y: random(height),
+			size: random(3, 15),
+			speedX: random(-2, 2),
+			speedY: random(-2, 2),
+			angle: random(TWO_PI),
+			rotSpeed: random(-0.1, 0.1),
+			type: floor(random(3)) // 0: circle, 1: square, 2: triangle
+		});
+	}
+
+	// Initialize background shapes
+	for (let i = 0; i < 20; i++) {
+		bgShapes.push({
+			x: random(width),
+			y: random(height),
+			size: random(20, 80),
+			angle: random(TWO_PI),
+			type: floor(random(4))
+		});
+	}
 }
 
 
@@ -13,6 +47,10 @@ function draw() {
 	let mainColor = '#000000';
 	let bgColor = '#f95d2d';
 	background(bgColor);
+
+	// Draw background chaos
+	drawBackgroundChaos();
+
 	noStroke();
 	fill(mainColor);
 
@@ -20,15 +58,190 @@ function draw() {
 		let img = capture.get(0, 0, capture.width, capture.height);
 		img.loadPixels();
 
-		const step = 7;
-		for (var y = step; y < img.height; y += step) {
-			for (var x = step; x < img.width; x += step) {
-				const darkness = getPixelDarknessAtPosition(img, x, y);
-				const radius = 17 * darkness;
-				let sX = x * width / img.width;
-				let sY = y * height / img.height;
-				circle(sX, sY, radius);
+		// Calculate center of mass and movement
+		calculateMovement(img);
+
+		// Random glitch trigger
+		if (random(1) < 0.02) {
+			glitchActive = true;
+			glitchOffset = random(-1, 1);
+		} else if (random(1) < 0.3) {
+			glitchActive = false;
+		}
+
+		// Draw person with or without glitch
+		if (glitchActive) {
+			drawGlitchedPerson(img);
+		} else {
+			drawNormalPerson(img);
+		}
+	}
+}
+
+function drawBackgroundChaos() {
+	// Update and draw particles based on mouse position
+	let mouseInfluence = dist(mouseX, mouseY, pmouseX, pmouseY);
+
+	for (let p of particles) {
+		// Mouse influence
+		let distToMouse = dist(p.x, p.y, mouseX, mouseY);
+		if (distToMouse < 150) {
+			let force = map(distToMouse, 0, 150, 5, 0);
+			let angle = atan2(p.y - mouseY, p.x - mouseX);
+			p.speedX += cos(angle) * force * 0.1;
+			p.speedY += sin(angle) * force * 0.1;
+		}
+
+		// Movement intensity influence
+		p.speedX += (movementIntensity - 0.5) * 0.5;
+		p.speedY += (movementIntensity - 0.5) * 0.3;
+
+		// Update position
+		p.x += p.speedX;
+		p.y += p.speedY;
+		p.angle += p.rotSpeed;
+
+		// Damping
+		p.speedX *= 0.95;
+		p.speedY *= 0.95;
+
+		// Wrap around screen
+		if (p.x < 0) p.x = width;
+		if (p.x > width) p.x = 0;
+		if (p.y < 0) p.y = height;
+		if (p.y > height) p.y = 0;
+
+		// Draw particle
+		push();
+		translate(p.x, p.y);
+		rotate(p.angle);
+
+		// Color based on position and movement
+		let hue = map(p.x + p.y + frameCount, 0, width + height, 0, 360);
+		colorMode(HSB);
+		fill(hue % 360, 70, 50, 100);
+		noStroke();
+
+		if (p.type === 0) {
+			circle(0, 0, p.size);
+		} else if (p.type === 1) {
+			rect(-p.size/2, -p.size/2, p.size, p.size);
+		} else {
+			triangle(0, -p.size/2, -p.size/2, p.size/2, p.size/2, p.size/2);
+		}
+
+		colorMode(RGB);
+		pop();
+	}
+
+	// Draw animated background shapes
+	for (let i = 0; i < bgShapes.length; i++) {
+		let s = bgShapes[i];
+
+		// Animate based on head movement and mouse
+		s.angle += 0.02 + movementIntensity * 0.1;
+		s.size = 30 + sin(frameCount * 0.05 + i) * 20 + movementIntensity * 30;
+
+		let targetX = s.x + (mouseX - width/2) * 0.01;
+		let targetY = s.y + (mouseY - height/2) * 0.01;
+
+		push();
+		translate(targetX, targetY);
+		rotate(s.angle);
+
+		colorMode(HSB);
+		let alpha = map(sin(frameCount * 0.03 + i), -1, 1, 20, 60);
+		fill((frameCount + i * 30) % 360, 60, 80, alpha);
+		noStroke();
+
+		if (s.type === 0) {
+			circle(0, 0, s.size);
+		} else if (s.type === 1) {
+			rect(-s.size/2, -s.size/2, s.size, s.size);
+		} else if (s.type === 2) {
+			triangle(0, -s.size/2, -s.size/2, s.size/2, s.size/2, s.size/2);
+		} else {
+			// Random lines
+			line(-s.size, 0, s.size, 0);
+			line(0, -s.size, 0, s.size);
+		}
+
+		colorMode(RGB);
+		pop();
+	}
+}
+
+function calculateMovement(img) {
+	let totalDarkness = 0;
+	let totalX = 0;
+	let totalY = 0;
+	let count = 0;
+
+	const step = 7;
+	for (let y = step; y < img.height; y += step) {
+		for (let x = step; x < img.width; x += step) {
+			const darkness = getPixelDarknessAtPosition(img, x, y);
+			if (darkness > 0.3) {
+				totalDarkness += darkness;
+				totalX += x * darkness;
+				totalY += y * darkness;
+				count++;
 			}
+		}
+	}
+
+	if (totalDarkness > 0) {
+		centerOfMassX = totalX / totalDarkness;
+		centerOfMassY = totalY / totalDarkness;
+
+		let deltaX = centerOfMassX - prevCenterX;
+		let deltaY = centerOfMassY - prevCenterY;
+		movementIntensity = constrain(sqrt(deltaX * deltaX + deltaY * deltaY) / 10, 0, 1);
+
+		prevCenterX = centerOfMassX;
+		prevCenterY = centerOfMassY;
+	}
+}
+
+function drawNormalPerson(img) {
+	const step = 7;
+	for (let y = step; y < img.height; y += step) {
+		for (let x = step; x < img.width; x += step) {
+			const darkness = getPixelDarknessAtPosition(img, x, y);
+			const radius = 17 * darkness;
+			let sX = x * width / img.width;
+			let sY = y * height / img.height;
+			circle(sX, sY, radius);
+		}
+	}
+}
+
+function drawGlitchedPerson(img) {
+	const step = 7;
+	const sliceHeight = 20; // Height of each horizontal slice
+
+	for (let y = step; y < img.height; y += step) {
+		// Calculate which slice this row belongs to
+		let sliceIndex = floor(y / sliceHeight);
+		let sliceOffset = 0;
+
+		// Random offset for each slice
+		if (random(1) < 0.7) {
+			sliceOffset = random(-30, 30) * glitchOffset;
+		}
+
+		for (let x = step; x < img.width; x += step) {
+			const darkness = getPixelDarknessAtPosition(img, x, y);
+			const radius = 17 * darkness;
+			let sX = x * width / img.width + sliceOffset;
+			let sY = y * height / img.height;
+
+			// Add some vertical jitter too
+			if (random(1) < 0.1) {
+				sY += random(-5, 5);
+			}
+
+			circle(sX, sY, radius);
 		}
 	}
 }
