@@ -1,11 +1,11 @@
-// ASCII Art Camera Effect with Face Detection and Matrix Background
+// ASCII Art Camera Effect with Matrix Background
 // Global variables
 let capture;
-let faceDetector;
-let detections = [];
 let matrixColumns = [];
 let asciiChars = '@#S%?*+;:,. ';
 let codeChars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789@#$%^&*(){}[]<>/?';
+let previousFrame;
+let motionThreshold = 25;
 
 function setup() {
   createCanvas(windowWidth, windowHeight);
@@ -15,8 +15,8 @@ function setup() {
   capture.size(640, 480);
   capture.hide();
   
-  // Initialize face detection with ml5.js
-  faceDetector = ml5.faceApi(capture, modelReady);
+  // Initialize previous frame for motion detection
+  previousFrame = createImage(capture.width, capture.height);
   
   // Initialize Matrix background
   initMatrix();
@@ -24,24 +24,8 @@ function setup() {
   // Set initial drawing properties
   textAlign(CENTER, CENTER);
   noStroke();
-}
-
-function modelReady() {
-  console.log('Face detection model loaded!');
-  detectFaces();
-}
-
-function detectFaces() {
-  faceDetector.detect(gotFaces);
-}
-
-function gotFaces(error, results) {
-  if (error) {
-    console.error(error);
-    return;
-  }
-  detections = results;
-  detectFaces(); // Continue detecting
+  
+  console.log('ASCII Camera Effect initialized!');
 }
 
 function draw() {
@@ -54,21 +38,22 @@ function draw() {
   // Process camera image
   capture.loadPixels();
   
-  if (detections.length > 0) {
-    // Render faces with ASCII art
-    for (let detection of detections) {
-      renderASCIIFace(detection);
-    }
-  }
+  // Render ASCII art from camera
+  renderASCIIVideo();
+  
+  // Update previous frame for next iteration
+  updatePreviousFrame();
 }
 
-function renderASCIIFace(detection) {
-  const face = detection.alignedRect._box;
-  const x = face._x;
-  const y = face._y;
-  const w = face._width;
-  const h = face._height;
-  
+function updatePreviousFrame() {
+  previousFrame.loadPixels();
+  for (let i = 0; i < capture.pixels.length; i++) {
+    previousFrame.pixels[i] = capture.pixels[i];
+  }
+  previousFrame.updatePixels();
+}
+
+function renderASCIIVideo() {
   // Scale factors for display
   const scaleX = width / capture.width;
   const scaleY = height / capture.height;
@@ -76,15 +61,23 @@ function renderASCIIFace(detection) {
   // ASCII character size
   const charSize = 8;
   
-  // Iterate through the face region
-  for (let j = 0; j < h; j += charSize) {
-    for (let i = 0; i < w; i += charSize) {
-      const px = floor(x + i);
-      const py = floor(y + j);
-      
-      if (px >= 0 && px < capture.width && py >= 0 && py < capture.height) {
+  // Calculate center region (focus on face area typically in center)
+  const centerX = capture.width / 2;
+  const centerY = capture.height / 2;
+  const regionWidth = capture.width * 0.7;
+  const regionHeight = capture.height * 0.7;
+  
+  const startX = floor(centerX - regionWidth / 2);
+  const startY = floor(centerY - regionHeight / 2);
+  const endX = floor(centerX + regionWidth / 2);
+  const endY = floor(centerY + regionHeight / 2);
+  
+  // Iterate through the center region (typical face area)
+  for (let j = startY; j < endY; j += charSize) {
+    for (let i = startX; i < endX; i += charSize) {
+      if (i >= 0 && i < capture.width && j >= 0 && j < capture.height) {
         // Get pixel brightness
-        const index = (py * capture.width + px) * 4;
+        const index = (j * capture.width + i) * 4;
         const r = capture.pixels[index];
         const g = capture.pixels[index + 1];
         const b = capture.pixels[index + 2];
@@ -92,19 +85,27 @@ function renderASCIIFace(detection) {
         // Calculate brightness
         const brightness = (r + g + b) / 3;
         
+        // Calculate motion (difference from previous frame)
+        previousFrame.loadPixels();
+        const prevR = previousFrame.pixels[index];
+        const prevG = previousFrame.pixels[index + 1];
+        const prevB = previousFrame.pixels[index + 2];
+        const motion = abs((r - prevR) + (g - prevG) + (b - prevB)) / 3;
+        
         // Map brightness to ASCII character
         const charIndex = floor(map(brightness, 0, 255, asciiChars.length - 1, 0));
         const char = asciiChars[charIndex];
         
         // Calculate display position
-        const displayX = (x + i) * scaleX;
-        const displayY = (y + j) * scaleY;
+        const displayX = i * scaleX;
+        const displayY = j * scaleY;
         
-        // Dynamic animation based on frame count and position
+        // Dynamic animation based on frame count, position, and motion
         const glowIntensity = map(sin(frameCount * 0.05 + i * 0.1 + j * 0.1), -1, 1, 0.5, 1);
+        const motionBoost = motion > motionThreshold ? 1.3 : 1.0;
         
         // Cyberpunk orange/amber color with glow
-        const orangeIntensity = map(brightness, 0, 255, 50, 255);
+        const orangeIntensity = map(brightness, 0, 255, 50, 255) * motionBoost;
         const r_display = orangeIntensity * glowIntensity;
         const g_display = (orangeIntensity * 0.5) * glowIntensity;
         const b_display = 0;
@@ -114,11 +115,21 @@ function renderASCIIFace(detection) {
         textSize(charSize * 1.5);
         text(char, displayX, displayY);
         
-        // Extra glow layer for bright areas
-        if (brightness > 150) {
-          fill(255, 150, 0, 100);
+        // Extra glow layer for bright areas or motion
+        if (brightness > 150 || motion > motionThreshold * 2) {
+          fill(255, 150, 0, 150);
           textSize(charSize * 2);
           text(char, displayX, displayY);
+          
+          // Glitch effect on high motion
+          if (motion > motionThreshold * 3) {
+            push();
+            translate(random(-2, 2), random(-2, 2));
+            fill(255, 100, 0, 100);
+            textSize(charSize * 1.8);
+            text(random(codeChars.split('')), displayX, displayY);
+            pop();
+          }
         }
       }
     }
